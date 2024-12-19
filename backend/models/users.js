@@ -1,8 +1,7 @@
 const DbConnection = require("../../database/connection");
 const Dbname = require("../../database/name")
 const moment = require("moment-timezone");
-const userCollection = Dbname.userCollection
-
+const userCollection = Dbname.userCollection;
 
 const register = async (data) => {
     let date = moment.tz(Date.now(), "Africa/Lagos");
@@ -73,5 +72,4 @@ const addNewPassword = async (data) => {
 module.exports = {
     register,
     getShortProfile,
-    addNewPassword,
 }

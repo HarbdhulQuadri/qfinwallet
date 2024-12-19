@@ -9,7 +9,48 @@ function validation(req, res, next) {
     }
     next()
 }
-
+const getToken = [
+    header("Authorization")
+      .exists()
+      .withMessage("Authorization is required")
+      .trim(),
+    (req, res, next) => {
+      validation(req, res, next);
+    },
+    async (req, res, next) => {
+      if (req.headers.authorization && req.headers.authorization.split(" ")[0] === "Bearer") {
+        let token = req.headers.authorization.split(" ")[1]; // Use lowercase 'token'
+        try {
+          const decoded = jwt.verify(token, process.env.JWTSECRET);
+          let data = { userID: decoded.userID };
+          console.log("ID:", data.userID);
+  
+          const result = await tokenModel.getToken(data);
+          if (result.data.length === 0) {
+            return res.status(401).json({ error: true, message: "Session Expired Kindly Login Again..... " });
+          }
+  
+          // Check for token expiration and mismatch
+          if (result.data[0].expire_at < new Date() || token !== result.data[0].accessToken) {
+            return res.status(401).json({ error: true, message: globalMessage.AuthorizationExpire });
+          }
+  
+          // Successful token validation
+          req.query.userID = decoded.userID;
+          next();
+        } catch (error) {
+          // Handle potential JWT errors (including expired tokens)
+          if (error instanceof jwt.TokenExpiredError) {
+            // Inform user about expired token and prompt re-authentication
+            return res.status(401).json({ error: true, message: "Your session has expired. Please log in again." });
+          }
+          return res.status(403).json({ error: true, message: error.message });
+        }
+      } else {
+        return res.status(403).json({ error: true, message: globalMessage.AuthorizationNotSupported });
+      }
+    },
+  ];
 const register = [
     body('fullName').exists().withMessage('Full name is required').trim(),
     (req, res, next) => {
@@ -29,10 +70,7 @@ const register = [
     (req, res, next) => {
         validation(req, res, next);
     },
-    body('userType').exists().withMessage('Type is require').isIn(['driver', 'user',"admin"]).withMessage('Type can be either Driver or User or Admin').trim(),
-    (req, res, next) => {
-        validation(req, res, next);
-    },
+
     body('password').exists().withMessage('Password is required')
         .matches(/[a-z]/g).withMessage('Please enter a password with a small letter')
         .matches(/[A-Z]/g).withMessage('Please enter a password with a Capital letter')
@@ -48,7 +86,7 @@ const register = [
     // },
 ]
 
-const VerifyOTP = [
+const verifyOTP = [
     body('user').exists().withMessage('Email Adddress or Phone number is required').trim(),
     (req, res, next) => {
         validation(req, res, next);
@@ -59,7 +97,7 @@ const VerifyOTP = [
     }
 ]
 
-const resentOTP = [
+const resendOTP = [
     body('user').exists().withMessage('Email Adddress or Phone number is required').trim(),
     (req, res, next) => {
         validation(req, res, next);
@@ -137,12 +175,14 @@ const biometricProfile = [
 
 module.exports = {
     register,
-    VerifyOTP,
+    verifyOTP,
     login,
     socialProfile,
     resetPassword,
-    resentOTP,
+    resendOTP,
     addNewPassword,
     addBiometric,
-    biometricProfile
+    biometricProfile,
+    getToken
 }
+

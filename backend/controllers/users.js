@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const {sendOTPEmail,sendResendOTPEmail,sendVerificationSuccessEmail} = require('../../thirdParty/email');
 const authService = require("../services/users")
 const globalMessage = require("../../utility/globalMessage");
-// const tokenModel = require("../models/tok");
+const tokenModel = require("../models/token");
 // const authModel = require("../models/users");
 
 
@@ -12,39 +12,12 @@ const register = async (req, res) => {
     let data = req.body;
     try {
         let shortProfile = await authService.checkUserExist(data);
+        console.log("2",shortProfile)
+
         if (shortProfile.emailProfile.data.length === 0 && shortProfile.phoneProfile.data.length === 0) {
             const registerResult = await authService.register(data);
-            const recipientEmail = data.emailAddress; // Assuming email is part of user data
-            if (!registerResult.error) {
-                const addOTP = await authService.AddOTP(data);
-                if (!addOTP.error) {
-                    await sendOTPEmail(recipientEmail, addOTP.otp);
-                    res.status(200).json({
-                        status_code: 200,
-                        status: "success",
-                        message: registerResult.message,
-                        data: {otp: addOTP.otp}
-                    }) // remove the otp later
-                }
-            } else {
-                res.status(500).json({status_code: 500, status: "error ", message: "Internal Server Error"})
-            }
-        } else if (shortProfile.emailProfile.data.length !== 0) {
-            res.status(403).json({status_code: 403, status: "error", message: globalMessage.emailTaken})
-        } else {
-            res.status(403).json({status_code: 403, status: "error", message: globalMessage.phoneTaken})
-        }
-    } catch (error) {
-        res.status(500).json({status_code: 500, status: "error ", message: "Internal Server Error"})
-    }
-}
-const registerFleetDriver = async (req, res) => {
-    let data = req.body;
-    data.fleetID = req.query.fleetID
-    try {
-        let shortProfile = await authService.checkUserExist(data);
-        if (shortProfile.emailProfile.data.length === 0 && shortProfile.phoneProfile.data.length === 0) {
-            const registerResult = await authService.registerFleetDriver(data);
+            console.log("2",registerResult)
+
             const recipientEmail = data.emailAddress; // Assuming email is part of user data
             if (!registerResult.error) {
                 const addOTP = await authService.AddOTP(data);
