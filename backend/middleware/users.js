@@ -1,4 +1,6 @@
 const globalMessage = require("../../utility/globalMessage")
+const jwt = require("jsonwebtoken");
+const tokenModel = require("../models/token");
 
 const { check, body, query, oneOf, header, validationResult } = require('express-validator');
 

@@ -67,9 +67,26 @@ const addNewPassword = async (data) => {
         return ({ error: true, message: error.message })
     }
 }
+const updateBalance = async (data) => {
+    let myquery = { userID: data.userID };
+    let newvalues = {
+        $set: {
+            userID: data.userID,  
+            balance: data.balance
+        }
+    };
+    let upsert = { upsert: true }
+    try {
+         await DbConnection.updateData(userCollection, myquery, newvalues, upsert);
+        return ({ error: false, message: "successfully" });
+    } catch (error) {
+        return ({ error: true, message: error.message })
+    }
+}
 
   
 module.exports = {
     register,
     getShortProfile,
+    updateBalance,
 }
