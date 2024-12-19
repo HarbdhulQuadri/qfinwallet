@@ -22,9 +22,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Modular routers
-const liftzorRouter = require("./backend/router/route");
+const walletRouter = require("./backend/router/router");
 
-app.use("/liftzor", liftzorRouter);
+app.use("/wallet", walletRouter);
 
 app.get("/test", (req, res) => {
   res.json({
