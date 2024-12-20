@@ -84,9 +84,37 @@ const updateBalance = async (data) => {
     }
 }
 
-  
+const getUserProfile = async (data) => {
+    try {
+        let aggregation = [
+            {
+                $match: {
+                    userID: data.userID
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    userID: 1,
+                    fullName: 1,
+                    emailAddress: 1,
+                    phoneNumber: 1,
+                    registerDate: 1,
+                    balance: 1,
+                }
+            }
+        ];
+
+        const userProfile = await DbConnection.aggregateData(userCollection, aggregation);
+        return { error: false, data: userProfile.data };
+    } catch (error) {
+        return { error: true, message: error.message };
+    }
+};
+
 module.exports = {
     register,
     getShortProfile,
     updateBalance,
+    getUserProfile
 }

@@ -366,6 +366,26 @@ const refreshToken = async (req, res) => {
     }
 }
 
+const getUserProfile = async (req, res) => {
+    let data = req.query;
+    data.userID = req.query.userID;
+    try {
+        const profile = await authService.getUserProfile(data);
+
+        if (!profile.error) {
+            if (profile.data) {
+                res.status(200).json({ status_code: 200, status: "success", data: profile.data });
+            } else {
+                res.status(404).json({ status_code: 404, status: "not found", message: "User profile not found" });
+            }
+        } else {
+            res.status(500).json({ status_code: 500, status: "error", message: "Internal Server Error" });
+        }
+    } catch (error) {
+        res.status(500).json({ status_code: 500, status: "server error", message: "Internal Server Error" });
+    }
+};
+
 module.exports = {
     register,
     verifyOTP,
@@ -380,6 +400,5 @@ module.exports = {
     getBankList,
     resolveAccount,
     forgotPassword,
-
-
+    getUserProfile
 }

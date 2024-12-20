@@ -209,6 +209,14 @@ const resolveAccount = async (data) => {
     }
 }
 
+const getUserProfile = async (data) => {
+    try {
+        const profile = await authModel.getUserProfile(data);
+        return profile;
+    } catch (error) {
+        return ({ error: true, message: error.message });
+    }
+};
 
 const refreshToken = async (data) => {
     try {
@@ -240,4 +248,5 @@ module.exports = {
     getBankList,
     resolveAccount,
     forgotPassword,
+    getUserProfile
 }

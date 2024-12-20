@@ -36,6 +36,103 @@ const createTransaction = async (data) => {
     }
 };
 
+
+
+const getAllTransactions = async (data) => {
+    let aggregate = [
+        {
+            $match: {
+                $or: [{ senderID: data.userID }, { recipientID: data.userID }]
+            }
+        },
+        {
+            $project: {
+                _id: 0, transactionID: 1, senderID: 1, recipientID: 1, amount: 1, 
+                type: 1, status: 1, description: 1, createdAt: 1
+            }
+        }
+    ];
+    try {
+        const result = await DbConnection.aggregateData(transactionsCollection, aggregate);
+        return ({ error: false, data: result.data });
+    } catch (error) {
+        return ({ error: true, message: error.message });
+    }
+};
+
+const getOneTransaction = async (data) => {
+    let aggregate = [
+        {
+            $match: {
+                transactionID: data.transactionID,
+                $or: [{ senderID: data.userID }, { recipientID: data.userID }]
+            }
+        },
+        {
+            $project: {
+                _id: 0, transactionID: 1, senderID: 1, recipientID: 1, amount: 1, 
+                type: 1, status: 1, description: 1, createdAt: 1
+            }
+        }
+    ];
+    try {
+        const result = await DbConnection.aggregateData(transactionsCollection, aggregate);
+        return ({ error: false, data: result.data });
+    } catch (error) {
+        return ({ error: true, message: error.message });
+    }
+};
+
+const getTransactionByType = async (data) => {
+    let aggregate = [
+        {
+            $match: {
+                type: data.type,
+                $or: [{ senderID: data.userID }, { recipientID: data.userID }]
+            }
+        },
+        {
+            $project: {
+                _id: 0, transactionID: 1, senderID: 1, recipientID: 1, amount: 1, 
+                type: 1, status: 1, description: 1, createdAt: 1
+            }
+        }
+    ];
+    try {
+        const result = await DbConnection.aggregateData(transactionsCollection, aggregate);
+        return ({ error: false, data: result.data });
+    } catch (error) {
+        return ({ error: true, message: error.message });
+    }
+};
+
+const getTransactionByStatus = async (data) => {
+    let aggregate = [
+        {
+            $match: {
+                status: data.status,
+                $or: [{ senderID: data.userID }, { recipientID: data.userID }]
+            }
+        },
+        {
+            $project: {
+                _id: 0, transactionID: 1, senderID: 1, recipientID: 1, amount: 1, 
+                type: 1, status: 1, description: 1, createdAt: 1
+            }
+        }
+    ];
+    try {
+        const result = await DbConnection.aggregateData(transactionsCollection, aggregate);
+        return ({ error: false, data: result.data });
+    } catch (error) {
+        return ({ error: true, message: error.message });
+    }
+};
+
 module.exports = { 
-    createTransaction 
+    createTransaction,
+    getAllTransactions,
+    getOneTransaction,
+    getTransactionByType,
+    getTransactionByStatus
 };
