@@ -1,6 +1,9 @@
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
 const transactionService = require("../services/transactions");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const cryptoRandomString = require("crypto-random-string");
+
 
 const transferMoney = async (req, res) => {
     let { user, amount } = req.body; // Extract email and amount from the body
@@ -60,36 +63,71 @@ const transferMoney = async (req, res) => {
         });
     }
 };
+
 const depositMoney = async (req, res) => {
-    const { amount, stripePaymentMethodId } = req.body;
-    const userID = req.query.userID; // Extract sender ID from query or token
+    const { amount } = req.body;
+    const userID = req.query.userID;
 
     try {
-        const response = await transactionService.depositMoney({
-            userID,
-            amount,
-            stripePaymentMethodId,
+        // Create a payment intent
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(amount * 100), // Convert to cents
+            currency: 'usd',
+            metadata: {
+                userID: userID,
+            }
         });
 
-        if (!response.error) {
-            res.status(200).json({
-                status_code: 200,
-                status: "success",
-                message: response.message,
-                transactionID: response.transactionID,
+        res.status(200).json({
+            status_code: 200,
+            status: "success",
+            clientSecret: paymentIntent.client_secret
+        });
+    } catch (error) {
+        res.status(400).json({
+            status_code: 400,
+            status: "error",
+            message: error.message || "Failed to initiate deposit"
+        });
+    }
+};
+
+// Add new endpoint to handle successful payment
+const confirmDeposit = async (req, res) => {
+    const { paymentIntentId } = req.body;
+    const userID = req.query.userID;
+
+    try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        
+        if (paymentIntent.status === 'succeeded') {
+            const amount = paymentIntent.amount / 100; // Convert from cents
+            
+            // Process the deposit through service
+            const response = await transactionService.depositMoney({
+                userID,
+                amount,
+                paymentIntentId
             });
+
+            if (!response.error) {
+                res.status(200).json({
+                    status_code: 200,
+                    status: "success",
+                    message: "Deposit successful",
+                    transactionID: response.transactionID,
+                });
+            } else {
+                throw new Error(response.message);
+            }
         } else {
-            res.status(400).json({
-                status_code: 400,
-                status: "error",
-                message: response.message,
-            });
+            throw new Error('Payment not successful');
         }
     } catch (error) {
-        res.status(500).json({
-            status_code: 500,
+        res.status(400).json({
+            status_code: 400,
             status: "error",
-            message: "Internal Server Error",
+            message: error.message || "Failed to confirm deposit"
         });
     }
 };
@@ -177,12 +215,210 @@ const getTransactionByStatus = async (req, res) => {
     }
 };
 
+const createCheckoutSession = async (req, res) => {
+    const { amount } = req.body;
+    const userID = req.query.userID;
+
+    try {
+        // Create initial pending transaction
+        const transactionID = await cryptoRandomString({ length: 12, type: "alphanumeric" });
+        const pendingTransaction = await transactionService.createPendingTransaction({
+            transactionID,
+            userID,
+            amount: parseFloat(amount),
+            type: 'deposit',
+            status: 'pending'
+        });
+
+        if (pendingTransaction.error) {
+            throw new Error(pendingTransaction.message);
+        }
+
+        // Create Stripe Checkout Session
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: 'Wallet Deposit',
+                    },
+                    unit_amount: Math.round(amount * 100),
+                },
+                quantity: 1,
+            }],
+            mode: 'payment',
+            success_url: req.body.success_url,
+            cancel_url: req.body.cancel_url,
+            metadata: {
+                userID: userID,
+                amount: amount,
+                transactionID: transactionID
+            }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            url: session.url,
+            transactionID
+        });
+    } catch (error) {
+        console.error('Checkout session error:', error);
+        res.status(400).json({
+            status: 'error',
+            message: error.message || 'Failed to create checkout session'
+        });
+    }
+};
+
+const handleStripeWebhook = async (req, res) => {
+    try {
+        const sig = req.headers['stripe-signature'];
+        const rawBody = req.body;
+        
+        console.log('Webhook Headers:', req.headers);
+        console.log('Webhook Raw Body:', rawBody);
+
+        let event;
+        try {
+            // Parse the raw body
+            event = JSON.parse(rawBody);
+        } catch (err) {
+            event = rawBody; // If already parsed
+        }
+
+        console.log('Webhook Event Type:', event.type);
+        console.log('Webhook Event Data:', event.data);
+
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            
+            // Update existing transaction and process deposit
+            const depositResult = await transactionService.updateTransactionAndDeposit({
+                transactionID: session.metadata.transactionID,
+                userID: session.metadata.userID,
+                amount: parseFloat(session.metadata.amount),
+                paymentIntentId: session.payment_intent,
+                stripeSessionId: session.id,
+                status: 'completed'
+            });
+
+            if (depositResult.error) {
+                throw new Error(depositResult.message);
+            }
+
+            res.json({ received: true, success: true });
+        } else if (event.type === 'checkout.session.expired' || event.type === 'payment_intent.payment_failed') {
+            // Handle failed payment by updating transaction status
+            const session = event.data.object;
+            await transactionService.updateTransactionStatus({
+                transactionID: session.metadata.transactionID,
+                status: 'failed'
+            });
+            
+            res.json({ received: true });
+        } else {
+            res.json({ received: true });
+        }
+    } catch (err) {
+        console.error('Webhook Error:', err);
+        return res.status(400).json({ error: err.message });
+    }
+};
+
+const verifyPayment = async (req, res) => {
+    const sessionId = req.params.sessionId;
+    const userID = req.query.userID;
+
+    try {
+        console.log('Starting verification for:', { sessionId, userID });
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        console.log('Stripe session status:', session.payment_status);
+
+        if (session.payment_status === 'paid') {
+            // Check if transaction was already processed
+            const existingCheck = await transactionService.checkExistingTransaction(sessionId);
+            
+            if (existingCheck.exists) {
+                return res.json({
+                    status: 'success',
+                    message: 'Payment already processed',
+                    data: existingCheck.data
+                });
+            }
+
+            // Process the payment
+            const depositResult = await transactionService.depositMoney({
+                userID,
+                amount: session.amount_total / 100,
+                paymentIntentId: session.payment_intent,
+                stripeSessionId: session.id
+            });
+
+            if (depositResult.error) {
+                throw new Error(depositResult.message);
+            }
+
+            return res.json({
+                status: 'success',
+                message: 'Payment verified successfully',
+                data: {
+                    transactionId: depositResult.transactionID,
+                    amount: session.amount_total / 100
+                }
+            });
+        } else {
+            throw new Error(`Payment not completed. Status: ${session.payment_status}`);
+        }
+    } catch (error) {
+        console.error('Verification error:', error);
+        res.status(400).json({
+            status: 'error',
+            message: error.message || 'Payment verification failed'
+        });
+    }
+};
+
+const getTransactionBySessionId = async (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        const userID = req.query.userID;
+
+        console.log('Checking transaction for session:', sessionId);
+        const existingTransaction = await transactionService.checkExistingTransaction(sessionId);
+        
+        if (!existingTransaction.error && existingTransaction.exists) {
+            return res.json({
+                status: 'success',
+                data: existingTransaction.data
+            });
+        }
+
+        res.status(404).json({
+            status: 'error',
+            message: 'Transaction not found'
+        });
+    } catch (error) {
+        console.error('Get transaction by session error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message || 'Failed to get transaction'
+        });
+    }
+};
+
 module.exports = {
     transferMoney,
     depositMoney,
     getAllTransactions,
     getOneTransaction,
     getTransactionByType,
-    getTransactionByStatus
+    getTransactionByStatus,
+    confirmDeposit,
+    createCheckoutSession,
+    handleStripeWebhook,
+    verifyPayment,
+    getTransactionBySessionId
 };
 

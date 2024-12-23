@@ -1,5 +1,5 @@
 const DbConnection = require("../../database/connection");
-const Dbname = require("../../database/name")
+const Dbname = require("../../database/name");
 const moment = require("moment-timezone");
 const transactionsCollection = Dbname.transactionsCollection;
 // Transactions {
@@ -13,30 +13,35 @@ const transactionsCollection = Dbname.transactionsCollection;
 //     datetime createdAt
 
 const createTransaction = async (data) => {
-    let date = moment.tz(Date.now(), "Africa/Lagos");
-    let myquery = { transactionID: data.transactionID };
-    let newvalues = {
-        $set: {
-            transactionID: data.transactionID,
-            senderID: data.senderID,
-            recipientID: data.recipientID,
-            amount: data.amount,
-            type: data.type,
-            status: data.status,
-            description: data.description,
-            createdAt: date.format()
-        }
-    };
-    let upsert = { upsert: true };
     try {
-        await DbConnection.updateData(transactionsCollection, myquery, newvalues, upsert);
-        return ({ error: false, message: "  Success" });
+        // Check if transaction already exists with either transactionID or stripeSessionId
+        let query = {};
+        if (data.stripeSessionId) {
+            query.stripeSessionId = data.stripeSessionId;
+        } else {
+            query.transactionID = data.transactionID;
+        }
+
+        const existing = await DbConnection.findData(transactionsCollection, query);
+        
+        if (existing.success && existing.data && existing.data.length > 0) {
+            return { error: true, message: "Transaction already processed" };
+        }
+
+        // Create new transaction
+        let date = moment.tz(Date.now(), "Africa/Lagos");
+        const newTransaction = {
+            ...data,
+            createdAt: date.format()
+        };
+        
+        const result = await DbConnection.insertData(transactionsCollection, newTransaction);
+        return { error: !result.success, message: result.message, data: result };
     } catch (error) {
-        return ({ error: true, message: error.message });
+        console.error('Create transaction error:', error);
+        return { error: true, message: error.message };
     }
 };
-
-
 
 const getAllTransactions = async (data) => {
     let aggregate = [
@@ -129,10 +134,52 @@ const getTransactionByStatus = async (data) => {
     }
 };
 
+const updateTransactionStatus = async (data) => {
+    try {
+        const updateData = {
+            $set: {
+                status: data.status,
+                ...(data.paymentIntentId && { paymentIntentId: data.paymentIntentId }),
+                ...(data.stripeSessionId && { stripeSessionId: data.stripeSessionId }),
+                updatedAt: moment.tz(Date.now(), "Africa/Lagos").format()
+            }
+        };
+
+        await DbConnection.updateData(
+            transactionsCollection,
+            { transactionID: data.transactionID },
+            updateData
+        );
+
+        return { error: false, message: "Success" };
+    } catch (error) {
+        return { error: true, message: error.message };
+    }
+};
+
+const checkExistingTransaction = async (sessionId) => {
+    try {
+        const existing = await DbConnection.findData(transactionsCollection, {
+            stripeSessionId: sessionId
+        });
+        
+        return { 
+            error: !existing.success, 
+            exists: existing.success && existing.data && existing.data.length > 0, 
+            data: existing.data?.[0] 
+        };
+    } catch (error) {
+        console.error('Check transaction error:', error);
+        return { error: true, message: error.message };
+    }
+};
+
 module.exports = { 
     createTransaction,
     getAllTransactions,
     getOneTransaction,
     getTransactionByType,
-    getTransactionByStatus
+    getTransactionByStatus,
+    updateTransactionStatus,
+    checkExistingTransaction
 };

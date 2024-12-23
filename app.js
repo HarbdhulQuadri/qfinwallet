@@ -1,89 +1,66 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const http = require("http");
-const { Server } = require("socket.io");
-// const initializeSocket = require('./socketHandler');
 const dbService = require("./database/connection");
 
-const port = process.env.PORT || 8080;
+const cors = require('cors');
 const app = express();
+const port = process.env.PORT || 5000; // Ensure the port matches the frontend URL
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
-});
 
-// Set up Socket.io
-// initializeSocket(io);
-// Combine body parsing middleware
+// Middleware
 
 app.use(express.json());
+app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 
-// Modular routers
+app.post('/webhook', (req, res) => {
+  const event = req.body;
+
+  if (event.type === 'payment_intent.succeeded') {
+      console.log('Payment succeeded:', event.data.object);
+  } else if (event.type === 'payment_intent.payment_failed') {
+      console.log('Payment failed:', event.data.object);
+  }
+
+  res.status(200).send();
+});
+// Serve React static files
+app.use(express.static(path.join(__dirname, "frontend/build")));
+
+// Serve Tailwind CSS
+app.use('/css/tailwind', express.static(path.join(__dirname, 'frontend/build/css')));
+
+// API Routes
 const walletRouter = require("./backend/router/router");
+app.use("/api/wallet", walletRouter); // Update base path to match frontend
 
-app.use("/wallet", walletRouter);
-
-app.get("/test", (req, res) => {
-  res.json({
-    success: true,
-    data: "here.......................",
-  });
+// Test Route
+app.get("/api/test", (req, res) => { // Update path to include /api
+  res.json({ success: true, message: "Backend is working!" });
 });
 
-// 404 Not Found middleware
-app.use((req, res, next) => {
-  next({
-    status: 404,
-    message: "Not Found",
-  });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  if (err.status === 404) {
-    return res.status(404).json({
-      status: 404,
-      message: "Not Found",
-    });
+// Serve React app for all other routes
+app.get("*", (req, res) => {
+  if (req.path === "/login") {
+    res.sendFile(path.join(__dirname, "frontend/build", "login.html"));
+  } else if (req.path === "/dashboard") {
+    res.sendFile(path.join(__dirname, "frontend/build", "dashboard.html"));
+  } else {
+    res.sendFile(path.join(__dirname, "frontend/build", "index.html"));
   }
-
-  if (err.status === 500) {
-    return res.status(500).json({
-      status: 500,
-      message: "Internal Server Error",
-    });
-  }
-
-  // If the error doesn't match 404 or 500, you might want to log it
-  console.error(err.message);
-
-  // Optional: Send a generic error response
-  res.status(500).json({
-    status: 500,
-    message: "Internal Server Error",
-  });
 });
 
-// Connect to the Database and start the server
+// Database connection and server startup
 const start = async () => {
   try {
     await dbService.serverConnection();
-    console.log("Connection to DB Successful...");
-    server.listen(port, () =>
-      console.log(`Server is listening on port ${port}...`)
-    );
-    // simulate a ready application after 1 second
-    setTimeout(function () {
-      // process.send('ready');
-    }, 1000);
+    console.log("Database connected successfully.");
+    server.listen(port, () => console.log(`Server running on port ${port}`));
   } catch (error) {
-    console.error(error.message);
+    console.error("Error starting server:", error.message);
   }
 };
 
 start();
-
-module.exports = server;
