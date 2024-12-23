@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 import Dashboard from './pages/DashboardPage';
-// import TestPage from './pages/TestPage'; // Ensure TestPage is imported
+import TestPage from './pages/TestPage'; // Ensure TestPage is imported
 import Transactions from './components/Transactions';
 import SendFunds from './components/SendFunds';
 import DepositFunds from './components/DepositFunds';
@@ -33,7 +33,7 @@ function App() {
           <Route path="/send-funds" element={<SendFunds />} />
           <Route path="/deposit-funds" element={<DepositFunds />} />
           <Route path="/payment/success" element={<PaymentSuccess />} />
-          {/* <Route path="/test" element={<TestPage />} /> Ensure TestPage route is defined */}
+          <Route path="/test" element={<TestPage />} /> Ensure TestPage route is defined
           <Route path="/" element={<Navigate to="/home" />} /> {/* Redirect "/" to Home */}
           <Route path="*" element={<NotFoundPage />} /> {/* Handle unknown routes */}
         </Routes>
