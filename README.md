@@ -1,7 +1,7 @@
 # QFinWallet - Digital Finance Management System
 
 ## Overview
-QFinWallet is a comprehensive digital wallet solution that enables secure money transfers, deposits, and transaction management. Built with the MERN stack and integrated with Stripe for payment processing.
+QFinWallet is a comprehensive digital wallet solution for secure money transfers and transaction management, built with React frontend and Node.js backend. The frontend is served directly from the backend after building.
 
 ## Core Features
 - 🔐 Secure User Authentication with OTP
@@ -23,6 +23,7 @@ QFinWallet is a comprehensive digital wallet solution that enables secure money 
 ## Prerequisites
 ```bash
 Node.js >= 14.0.0
+Yarn
 MongoDB
 Stripe Account
 Email Service Account
@@ -30,11 +31,10 @@ Email Service Account
 
 ## Environment Setup
 
-### Backend (.env)
+Create a `.env` file in the root directory:
 ```env
 PORT=5000
-mongoDbURl=your_mongodb_url
-dbName=your_database_name
+MONGODB_URI=your_mongodb_url
 JWT_SECRET=your_jwt_secret
 STRIPE_SECRET_KEY=your_stripe_secret
 STRIPE_WEBHOOK_SECRET=your_webhook_secret
@@ -42,134 +42,133 @@ EMAIL_USER=your_email
 EMAIL_PASS=your_email_password
 ```
 
-### Frontend (.env)
+Create a `.env` file in the frontend directory:
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=/api
 REACT_APP_STRIPE_PUBLIC_KEY=your_stripe_public_key
 ```
 
-## Quick Start
+## Installation & Setup
 
-1. Clone & Setup
+1. Clone the repository:
 ```bash
 git clone https://github.com/harbdhulquadri/qfinwallet.git
 cd qfinwallet
 ```
 
-2. Install Dependencies
+2. Install backend dependencies:
 ```bash
-# Backend
-npm install
+yarn install
+```
 
-# Frontend
+3. Install frontend dependencies:
+```bash
 cd frontend
-npm install
+yarn install
+cd ..
 ```
 
-3. Start Development Servers
+4. Build frontend:
 ```bash
-# Backend (root directory)
-npm run dev
-
-# Frontend (frontend directory)
-npm start
+cd frontend
+yarn build
+cd ..
 ```
 
-## API Documentation
+5. Start the server:
+```bash
+# Development mode
+yarn dev
+
+# Production mode
+yarn start
+```
+
+The app will be available at http://localhost:5000
+
+## Development Workflow
+
+1. For frontend development:
+```bash
+cd frontend
+yarn start
+```
+This runs the frontend on http://localhost:3000 with hot reloading.
+
+2. For backend development:
+```bash
+# In root directory
+yarn dev
+```
+
+3. Before deployment:
+```bash
+cd frontend
+yarn build
+cd ..
+yarn start
+```
+
+## API Endpoints
 
 ### Authentication
-- POST `/api/wallet/user/register` - Register
-- POST `/api/wallet/user/verifyOTP` - Verify OTP
-- POST `/api/wallet/user/login` - Login
-- GET `/api/wallet/user/profile` - Get Profile
+- POST `/api/wallet/user/register` - Register new user
+- POST `/api/wallet/user/verifyOTP` - Verify OTP code
+- POST `/api/wallet/user/login` - User login
+- GET `/api/wallet/user/profile` - Get user profile
 
 ### Transactions
-- POST `/api/wallet/transaction/transfer` - Transfer Money
-- POST `/api/wallet/transaction/create-checkout` - Create Deposit
-- GET `/api/wallet/transactions` - Get History
-- GET `/api/wallet/transaction/:id` - Get Transaction
+- POST `/api/wallet/transaction/transfer` - Transfer funds
+- POST `/api/wallet/transaction/deposit` - Deposit funds
+- GET `/api/wallet/transactions` - Transaction history
 
-## Stripe Integration
-
-1. Set up Stripe webhook:
-```bash
-stripe listen --forward-to localhost:5000/api/wallet/transaction/webhook
-```
-
-2. Configure success/failure URLs in frontend:
-```javascript
-success_url: `${window.location.origin}/payment/success`
-cancel_url: `${window.location.origin}/dashboard`
-```
-
-## Security Features
-- JWT Authentication
-- OTP Verification
-- Request Rate Limiting
-- Input Validation
-- XSS Protection
-- CORS Configuration
-
-## Folder Structure
+## Project Structure
 ```
 qfinwallet/
-├── backend/
+├── frontend/                # React frontend
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── src/                    # Backend code
 │   ├── controllers/
 │   ├── middleware/
 │   ├── models/
-│   ├── services/
-│   └── router/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── services/
-│   └── public/
-└── database/
+│   └── routes/
+├── package.json
+└── server.js
 ```
 
 ## Production Deployment
 
-1. Build Frontend
+1. Set environment variables
+2. Build frontend:
 ```bash
 cd frontend
-npm run build
+yarn build
+cd ..
+```
+3. Start production server:
+```bash
+yarn start
 ```
 
-2. Set Environment Variables
-- Configure production URLs
-- Set up MongoDB connection
-- Configure Stripe webhooks
+## Common Issues & Solutions
 
-3. Deploy
-- Host backend on service like Heroku
-- Deploy frontend build to static hosting
-- Set up SSL certificate
+1. Frontend not loading
+- Ensure frontend is built: `cd frontend && yarn build`
+- Check if backend is serving from correct build path
 
-## Common Issues
-
-1. Payment Verification
-- Ensure webhook is properly configured
-- Check transaction logs
-- Verify Stripe keys
-
-2. Transaction Failures
-- Check MongoDB connection
-- Verify user balance
-- Review transaction logs
+2. API Connection Issues
+- Verify `.env` configurations
+- Check if backend is running
+- Confirm API URLs are correct
 
 ## Contributing
-
-1. Fork repository
-2. Create feature branch
+1. Fork the repository
+2. Create your feature branch
 3. Commit changes
-4. Push to branch
-5. Open pull request
-
-## Support
-- GitHub Issues
-- Email: support@qfinwallet.com
-- Documentation: [Wiki](docs/wiki.md)
+4. Push to the branch
+5. Create Pull Request
 
 ## License
 MIT License - See [LICENSE](LICENSE.md)
