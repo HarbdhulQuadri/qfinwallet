@@ -147,12 +147,139 @@ const forgotPassword = async (recipientEmail, newPassword) => {
     }
 };
 
+// Function to send transfer notification to sender
+const sendTransferNotification = async (recipientEmail, amount, receiverEmail) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
 
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: 'Money Transfer Confirmation',
+            html: `
+                <h2>Transfer Confirmation</h2>
+                <p>You have successfully sent $${amount.toFixed(2)} to ${receiverEmail}.</p>
+                <p>If you did not make this transfer, please contact our support immediately.</p>
+                <p>Thank you for using our service!</p>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return { success: true, message: 'Transfer notification sent successfully' };
+    } catch (error) {
+        console.error('Error sending transfer notification:', error);
+        return { success: false, message: 'Failed to send transfer notification' };
+    }
+};
+
+// Function to notify receiver about incoming transfer
+const sendReceiveNotification = async (recipientEmail, amount, senderEmail) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: 'Money Received',
+            html: `
+                <h2>Money Received</h2>
+                <p>You have received $${amount.toFixed(2)} from ${senderEmail}.</p>
+                <p>The amount has been credited to your wallet.</p>
+                <p>Thank you for using our service!</p>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return { success: true, message: 'Receive notification sent successfully' };
+    } catch (error) {
+        console.error('Error sending receive notification:', error);
+        return { success: false, message: 'Failed to send receive notification' };
+    }
+};
+
+// Function to send deposit confirmation
+const sendDepositConfirmation = async (recipientEmail, amount, transactionId) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: 'Deposit Confirmation',
+            html: `
+                <h2>Deposit Successful</h2>
+                <p>Your deposit of $${amount.toFixed(2)} has been successfully processed.</p>
+                <p>Transaction ID: ${transactionId}</p>
+                <p>The amount has been credited to your wallet.</p>
+                <p>Thank you for using our service!</p>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return { success: true, message: 'Deposit confirmation sent successfully' };
+    } catch (error) {
+        console.error('Error sending deposit confirmation:', error);
+        return { success: false, message: 'Failed to send deposit confirmation' };
+    }
+};
+
+// Function to send login notification
+const sendLoginNotification = async (recipientEmail, loginTime, deviceInfo) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: 'New Login Detected',
+            html: `
+                <h2>New Login Alert</h2>
+                <p>A new login was detected on your account.</p>
+                <p>Time: ${loginTime}</p>
+                <p>Device: ${deviceInfo}</p>
+                <p>If this wasn't you, please secure your account immediately.</p>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return { success: true, message: 'Login notification sent successfully' };
+    } catch (error) {
+        console.error('Error sending login notification:', error);
+        return { success: false, message: 'Failed to send login notification' };
+    }
+};
 
 module.exports = {
     sendResendOTPEmail,
     sendOTPEmail,
     sendVerificationSuccessEmail,
-    forgotPassword
-
+    forgotPassword,
+    sendTransferNotification,
+    sendReceiveNotification,
+    sendDepositConfirmation,
+    sendLoginNotification
 };

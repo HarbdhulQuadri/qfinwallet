@@ -3,15 +3,16 @@ const transactionModel = require("../models/transactions");
 const userModel = require("../models/users");
 const cryptoRandomString = require("crypto-random-string");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const webSocket = require('../websocket');
+const emailService = require('../../thirdParty/email');
+
+// Remove or comment out these lines since we'll handle notifications differently
+// const notificationService = require('./notification');
+// const currencyService = require('./currency');
 
 const transferMoney = async (data) => {
     try {
         const { senderID, recipientID, amount } = data;
-
-        // Prevent self-transfer
-        if (senderID === recipientID) {
-            throw new Error("Cannot transfer money to yourself");
-        }
 
         // Validate required fields
         if (!amount || amount <= 0) {
@@ -63,7 +64,7 @@ const transferMoney = async (data) => {
             throw new Error("Failed to update recipient's balance");
         }
 
-        // Log the transaction
+        // Log the transaction with more descriptive message
         const transactionData = {
             transactionID,
             senderID: sender.userID,
@@ -71,7 +72,7 @@ const transferMoney = async (data) => {
             amount,
             type: "transfer",
             status: "completed",
-            description: `Transfer of ${amount} from ${sender.userID} to ${recipient.userID}`,
+            description: `Transfer of $${amount.toFixed(2)} from ${sender.emailAddress} to ${recipient.emailAddress}`,
             createdAt: new Date(),
         };
         const logTransaction = await transactionModel.createTransaction(transactionData);
@@ -79,6 +80,29 @@ const transferMoney = async (data) => {
             throw new Error("Failed to log transaction");
         }
         console.log("loe", logTransaction)
+
+        // Notify users via websocket with email addresses
+        if (webSocket) {
+            webSocket.notifyUser(sender.userID, `Money transferred successfully to ${recipient.emailAddress}`);
+            webSocket.notifyUser(recipient.userID, `You have received money from ${sender.emailAddress}`);
+        }
+
+        // Send email notifications with more context
+        try {
+            await emailService.sendTransferNotification(
+                sender.emailAddress,
+                amount,
+                recipient.emailAddress // Using email instead of full name
+            );
+            await emailService.sendReceiveNotification(
+                recipient.emailAddress,
+                amount,
+                sender.emailAddress // Using email instead of full name
+            );
+        } catch (emailError) {
+            console.error('Email notification failed:', emailError);
+            // Don't throw error, continue with transaction
+        }
 
         // Return success response
         return {
@@ -107,10 +131,10 @@ const depositMoney = async (data) => {
         }
         const user = userData.data[0];
 
-        // Generate transaction ID if not provided
-        const transactionID = data.transactionID || await cryptoRandomString({ length: 12, type: "alphanumeric" });
+        // Generate transaction ID
+        const transactionID = await cryptoRandomString({ length: 12, type: "alphanumeric" });
 
-        // Update balance first
+        // Update balance
         const newBalance = parseFloat(user.balance || 0) + parseFloat(amount);
         const updateBalance = await userModel.updateBalance({
             userID: user.userID,
@@ -139,13 +163,15 @@ const depositMoney = async (data) => {
         const result = await transactionModel.createTransaction(transactionData);
         
         if (result.error) {
-            // Rollback balance update if transaction creation fails
-            await userModel.updateBalance({
-                userID: user.userID,
-                balance: user.balance,
-            });
-            throw new Error(result.message || "Failed to log transaction");
+            throw new Error("Failed to log transaction");
         }
+
+        // Send deposit confirmation email
+        await emailService.sendDepositConfirmation(
+            user.emailAddress,
+            parseFloat(amount),
+            transactionID
+        );
 
         return {
             error: false,
@@ -266,8 +292,12 @@ const getTransactionByStatus = async (data) => {
 
 const checkExistingTransaction = async (sessionId) => {
     try {
-        const result = await transactionModel.checkExistingTransaction(sessionId);
-        return result;
+        const transaction = await transactionModel.findBySessionId(sessionId);
+        return {
+            error: false,
+            exists: !!transaction?.data,
+            data: transaction?.data
+        };
     } catch (error) {
         return {
             error: true,

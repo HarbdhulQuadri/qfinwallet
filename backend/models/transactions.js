@@ -174,6 +174,24 @@ const checkExistingTransaction = async (sessionId) => {
     }
 };
 
+const findBySessionId = async (sessionId) => {
+    try {
+        const result = await DbConnection.findData(transactionsCollection, {
+            stripeSessionId: sessionId
+        });
+
+        return {
+            error: false,
+            data: result.data?.[0]
+        };
+    } catch (error) {
+        return {
+            error: true,
+            message: error.message
+        };
+    }
+};
+
 module.exports = { 
     createTransaction,
     getAllTransactions,
@@ -181,5 +199,6 @@ module.exports = {
     getTransactionByType,
     getTransactionByStatus,
     updateTransactionStatus,
-    checkExistingTransaction
+    checkExistingTransaction,
+    findBySessionId
 };

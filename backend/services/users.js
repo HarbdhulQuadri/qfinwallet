@@ -10,6 +10,7 @@ const otpModel = require("../models/otp");
 const tokenModel = require("../models/token");
 const randomstring = require('randomstring')
 const sendMail = require('../../thirdParty/email');
+const emailService = require('../../thirdParty/email');
 
 
 
@@ -35,6 +36,12 @@ const Login = async (data) => {
         if (!answer) {
             return ({ error: true, message: "wrong password" })
         } else {
+            // Send login notification
+            await emailService.sendLoginNotification(
+                data.emailAddress,
+                new Date().toISOString(),
+                data.deviceInfo || 'Unknown Device'
+            );
 
             return ({
                 error: false,

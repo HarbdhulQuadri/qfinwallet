@@ -37,8 +37,6 @@ const transferMoney = async (req, res) => {
         // Call the service to process the transfer
         let status = await transactionService.transferMoney(data);
 
-        console.log("Service Response:", status); // Debugging log
-
         if (!status.error) {
             res.status(200).json({
                 status_code: 200,
@@ -54,8 +52,6 @@ const transferMoney = async (req, res) => {
             });
         }
     } catch (error) {
-        console.error("Error in transferMoney:", error); // Log the full error for debugging
-
         res.status(500).json({
             status_code: 500,
             status: "error",
@@ -263,7 +259,6 @@ const createCheckoutSession = async (req, res) => {
             transactionID
         });
     } catch (error) {
-        console.error('Checkout session error:', error);
         res.status(400).json({
             status: 'error',
             message: error.message || 'Failed to create checkout session'
@@ -275,9 +270,6 @@ const handleStripeWebhook = async (req, res) => {
     try {
         const sig = req.headers['stripe-signature'];
         const rawBody = req.body;
-        
-        console.log('Webhook Headers:', req.headers);
-        console.log('Webhook Raw Body:', rawBody);
 
         let event;
         try {
@@ -286,9 +278,6 @@ const handleStripeWebhook = async (req, res) => {
         } catch (err) {
             event = rawBody; // If already parsed
         }
-
-        console.log('Webhook Event Type:', event.type);
-        console.log('Webhook Event Data:', event.data);
 
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
@@ -321,7 +310,6 @@ const handleStripeWebhook = async (req, res) => {
             res.json({ received: true });
         }
     } catch (err) {
-        console.error('Webhook Error:', err);
         return res.status(400).json({ error: err.message });
     }
 };
@@ -331,48 +319,42 @@ const verifyPayment = async (req, res) => {
     const userID = req.query.userID;
 
     try {
-        console.log('Starting verification for:', { sessionId, userID });
-
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-        console.log('Stripe session status:', session.payment_status);
-
-        if (session.payment_status === 'paid') {
-            // Check if transaction was already processed
-            const existingCheck = await transactionService.checkExistingTransaction(sessionId);
-            
-            if (existingCheck.exists) {
-                return res.json({
-                    status: 'success',
-                    message: 'Payment already processed',
-                    data: existingCheck.data
-                });
-            }
-
-            // Process the payment
-            const depositResult = await transactionService.depositMoney({
-                userID,
-                amount: session.amount_total / 100,
-                paymentIntentId: session.payment_intent,
-                stripeSessionId: session.id
-            });
-
-            if (depositResult.error) {
-                throw new Error(depositResult.message);
-            }
-
+        const existingTransaction = await transactionService.checkExistingTransaction(sessionId);
+        if (existingTransaction.exists) {
             return res.json({
                 status: 'success',
-                message: 'Payment verified successfully',
-                data: {
-                    transactionId: depositResult.transactionID,
-                    amount: session.amount_total / 100
-                }
+                message: 'Payment already processed',
+                data: existingTransaction.data
             });
-        } else {
-            throw new Error(`Payment not completed. Status: ${session.payment_status}`);
         }
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        
+        if (session.payment_status !== 'paid') {
+            throw new Error(`Payment incomplete. Status: ${session.payment_status}`);
+        }
+
+        // Process the payment
+        const depositResult = await transactionService.depositMoney({
+            userID,
+            amount: session.amount_total / 100,
+            paymentIntentId: session.payment_intent,
+            stripeSessionId: sessionId
+        });
+
+        if (depositResult.error) {
+            throw new Error(depositResult.message);
+        }
+
+        res.json({
+            status: 'success',
+            message: 'Payment verified successfully',
+            data: {
+                transactionId: depositResult.transactionID,
+                amount: session.amount_total / 100
+            }
+        });
     } catch (error) {
-        console.error('Verification error:', error);
         res.status(400).json({
             status: 'error',
             message: error.message || 'Payment verification failed'
@@ -385,7 +367,6 @@ const getTransactionBySessionId = async (req, res) => {
         const sessionId = req.params.sessionId;
         const userID = req.query.userID;
 
-        console.log('Checking transaction for session:', sessionId);
         const existingTransaction = await transactionService.checkExistingTransaction(sessionId);
         
         if (!existingTransaction.error && existingTransaction.exists) {
@@ -400,7 +381,6 @@ const getTransactionBySessionId = async (req, res) => {
             message: 'Transaction not found'
         });
     } catch (error) {
-        console.error('Get transaction by session error:', error);
         res.status(500).json({
             status: 'error',
             message: error.message || 'Failed to get transaction'

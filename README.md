@@ -52,7 +52,7 @@ REACT_APP_STRIPE_PUBLIC_KEY=your_stripe_public_key
 
 1. Clone & Setup
 ```bash
-git clone https://github.com/yourusername/qfinwallet.git
+git clone https://github.com/harbdhulquadri/qfinwallet.git
 cd qfinwallet
 ```
 
